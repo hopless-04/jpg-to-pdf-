@@ -1,4 +1,5 @@
 require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -16,6 +17,7 @@ const PORT = process.env.PORT || 5000;
 // Ensure upload & output directories exist
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || './uploads');
 const outputDir = path.resolve(process.env.OUTPUT_DIR || './output');
+
 [uploadDir, outputDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -32,6 +34,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Logging - only in development
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
@@ -39,7 +42,7 @@ if (process.env.NODE_ENV !== 'production') {
 // Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 150, // limit each IP to 150 requests per windowMs
+  max: 150, // 150 requests per IP
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -47,6 +50,7 @@ const limiter = rateLimit({
     error: 'Too many requests from this IP, please try again after 15 minutes.'
   }
 });
+
 app.use('/api', limiter);
 
 // Mount API routes
@@ -55,18 +59,21 @@ app.use('/api', apiRoutes);
 // Global Error Handler
 app.use(errorHandler);
 
-// Start Server
-const server = app.listen(PORT, () => {
-  console.log(`===========================================`);
-  console.log(`PDF ↔ JPG Converter Backend Running!`);
-  console.log(`Port: ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Uploads Dir: ${uploadDir}`);
-  console.log(`Output Dir: ${outputDir}`);
-  console.log(`===========================================`);
+// Start server ONLY when running locally
+if (process.env.NODE_ENV !== 'production') {
+  const server = app.listen(PORT, () => {
+    console.log('===========================================');
+    console.log('PDF ↔ JPG Converter Backend Running!');
+    console.log(`Port: ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Uploads Dir: ${uploadDir}`);
+    console.log(`Output Dir: ${outputDir}`);
+    console.log('===========================================');
 
-  // Start background file cleanup service
-  startCleanupJob();
-});
+    // Start background file cleanup service
+    startCleanupJob();
+  });
+}
 
-module.exports = { app, server };
+// Export Express app for Vercel
+module.exports = app;
