@@ -14,26 +14,33 @@ const { startCleanupJob } = require('./services/cleanupService');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-/// File storage
-// Vercel serverless functions can only write temporary files to /tmp
-const isProduction = process.env.NODE_ENV === 'production';
+// ==========================================
+// File Storage
+// ==========================================
 
-const uploadDir = isProduction
+// Vercel provides the VERCEL environment variable.
+// Files written in Vercel should use /tmp.
+const isVercel = process.env.VERCEL === '1';
+
+const uploadDir = isVercel
   ? '/tmp/uploads'
   : path.resolve(process.env.UPLOAD_DIR || './uploads');
 
-const outputDir = isProduction
+const outputDir = isVercel
   ? '/tmp/output'
   : path.resolve(process.env.OUTPUT_DIR || './output');
 
-// Ensure directories exist
-[uploadDir, outputDir].forEach(dir => {
+// Create directories if they don't exist
+[uploadDir, outputDir].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 });
 
-// Security & Middlewares
+// ==========================================
+// Security & Middleware
+// ==========================================
+
 app.use(cors({
   origin: process.env.CLIENT_URL || '*',
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -43,15 +50,18 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Logging - only in development
-if (process.env.NODE_ENV !== 'production') {
+// Logging only during local development
+if (!isVercel) {
   app.use(morgan('dev'));
 }
 
+// ==========================================
 // Rate Limiting
+// ==========================================
+
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 150, // 150 requests per IP
+  windowMs: 15 * 60 * 1000,
+  max: 150,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -62,25 +72,39 @@ const limiter = rateLimit({
 
 app.use('/api', limiter);
 
-// Mount API routes
+// ==========================================
+// API Routes
+// ==========================================
+
 app.use('/api', apiRoutes);
 
+// ==========================================
 // Global Error Handler
+// ==========================================
+
 app.use(errorHandler);
 
-// Start server ONLY when running locally
-if (!isProduction) {
+// ==========================================
+// Local Development Server
+// ==========================================
+
+// Vercel handles the server.
+// app.listen() is only needed when running locally.
+if (!isVercel) {
   const server = app.listen(PORT, () => {
     console.log('===========================================');
     console.log('PDF ↔ JPG Converter Backend Running!');
     console.log(`Port: ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Vercel: ${isVercel}`);
     console.log(`Uploads Dir: ${uploadDir}`);
     console.log(`Output Dir: ${outputDir}`);
     console.log('===========================================');
 
+    // Start cleanup job only locally
     startCleanupJob();
   });
 }
 
+// Export Express app for Vercel
 module.exports = app;

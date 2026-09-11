@@ -14,6 +14,9 @@ const uploadDir = isVercel
   ? '/tmp/uploads'
   : path.resolve(process.env.UPLOAD_DIR || './uploads');
 
+console.log('VERCEL:', process.env.VERCEL);
+console.log('UPLOAD DIR:', uploadDir);
+
 // Create upload directory
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
