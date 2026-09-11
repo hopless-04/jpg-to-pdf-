@@ -14,10 +14,19 @@ const { startCleanupJob } = require('./services/cleanupService');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Ensure upload & output directories exist
-const uploadDir = path.resolve(process.env.UPLOAD_DIR || './uploads');
-const outputDir = path.resolve(process.env.OUTPUT_DIR || './output');
+/// File storage
+// Vercel serverless functions can only write temporary files to /tmp
+const isProduction = process.env.NODE_ENV === 'production';
 
+const uploadDir = isProduction
+  ? '/tmp/uploads'
+  : path.resolve(process.env.UPLOAD_DIR || './uploads');
+
+const outputDir = isProduction
+  ? '/tmp/output'
+  : path.resolve(process.env.OUTPUT_DIR || './output');
+
+// Ensure directories exist
 [uploadDir, outputDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -60,7 +69,7 @@ app.use('/api', apiRoutes);
 app.use(errorHandler);
 
 // Start server ONLY when running locally
-if (process.env.NODE_ENV !== 'production') {
+if (!isProduction) {
   const server = app.listen(PORT, () => {
     console.log('===========================================');
     console.log('PDF ↔ JPG Converter Backend Running!');
@@ -70,10 +79,8 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`Output Dir: ${outputDir}`);
     console.log('===========================================');
 
-    // Start background file cleanup service
     startCleanupJob();
   });
 }
 
-// Export Express app for Vercel
 module.exports = app;
