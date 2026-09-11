@@ -1,0 +1,27 @@
+{
+  "name": "pdf-jpg-converter-backend",
+  "version": "1.0.0",
+  "description": "Backend service for PDF to JPG and JPG to PDF conversion",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": ["pdf", "jpg", "converter", "pdfkit", "pdfjs"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.8",
+    "archiver": "^8.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.2.1",
+    "express-rate-limit": "^7.5.0",
+    "image-size": "^1.2.0",
+    "morgan": "^1.10.0",
+    "multer": "^2.3.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.3.289",
+    "pdfkit": "^0.20.2"
+  }
+}
