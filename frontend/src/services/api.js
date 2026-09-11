@@ -2,8 +2,7 @@
  * API service for PDF ↔ JPG Converter
  */
 
-const API_BASE = '/api';
-
+const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 /**
  * Get PDF metadata and page count
  */
