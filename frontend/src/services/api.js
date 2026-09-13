@@ -2,10 +2,38 @@
  * API service for PDF ↔ JPG Converter
  */
 
-// Backend URL from Vercel environment variable
-// Example:
+// Backend URL
+// Vercel Environment Variable:
 // VITE_API_URL=https://jpg-to-pdf-a5fy.vercel.app
-const API_BASE = `${(import.meta.env.VITE_API_URL || '').replace(/\/+$/, '')}/api`;
+//
+// IMPORTANT:
+// Do NOT add /api here.
+// This file adds /api automatically.
+
+const BACKEND_URL = (
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000'
+).replace(/\/+$/, '');
+
+const API_BASE = `${BACKEND_URL}/api`;
+
+
+/**
+ * Safely parse JSON response
+ */
+async function parseResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    return await response.json();
+  }
+
+  const text = await response.text();
+
+  throw new Error(
+    `Server returned an invalid response (${response.status}).`
+  );
+}
 
 
 /**
@@ -13,6 +41,7 @@ const API_BASE = `${(import.meta.env.VITE_API_URL || '').replace(/\/+$/, '')}/ap
  */
 export async function fetchPdfInfo(file) {
   const formData = new FormData();
+
   formData.append('file', file);
 
   const response = await fetch(`${API_BASE}/pdf-info`, {
@@ -20,10 +49,12 @@ export async function fetchPdfInfo(file) {
     body: formData,
   });
 
-  const data = await response.json();
+  const data = await parseResponse(response);
 
   if (!response.ok || !data.success) {
-    throw new Error(data.error || 'Failed to inspect PDF document.');
+    throw new Error(
+      data.error || 'Failed to inspect PDF document.'
+    );
   }
 
   return data.data;
@@ -37,7 +68,7 @@ export async function convertPdfToJpg(file, options = {}) {
   const {
     quality = 'high',
     dpi = 150,
-    pageRange = 'all'
+    pageRange = 'all',
   } = options;
 
   const formData = new FormData();
@@ -52,10 +83,12 @@ export async function convertPdfToJpg(file, options = {}) {
     body: formData,
   });
 
-  const data = await response.json();
+  const data = await parseResponse(response);
 
   if (!response.ok || !data.success) {
-    throw new Error(data.error || 'Failed to convert PDF.');
+    throw new Error(
+      data.error || 'Failed to convert PDF.'
+    );
   }
 
   return data.data;
@@ -72,7 +105,7 @@ export async function convertJpgToPdf(files, options = {}) {
     imageFit = 'fit',
     margin = 'none',
     pdfName = 'converted_images.pdf',
-    order = []
+    order = [],
   } = options;
 
   const formData = new FormData();
@@ -93,10 +126,12 @@ export async function convertJpgToPdf(files, options = {}) {
     body: formData,
   });
 
-  const data = await response.json();
+  const data = await parseResponse(response);
 
   if (!response.ok || !data.success) {
-    throw new Error(data.error || 'Failed to generate PDF.');
+    throw new Error(
+      data.error || 'Failed to generate PDF.'
+    );
   }
 
   return data.data;
@@ -106,15 +141,20 @@ export async function convertJpgToPdf(files, options = {}) {
 /**
  * Trigger browser file download
  *
- * Backend usually returns URLs like:
+ * Backend returns URLs such as:
  * /api/download/...
  *
- * This converts them into the full Vercel backend URL.
+ * This converts relative URLs into:
+ * https://jpg-to-pdf-a5fy.vercel.app/api/download/...
  */
 export function triggerDownload(url, filename) {
-  const downloadUrl = url.startsWith('http')
-    ? url
-    : `${(import.meta.env.VITE_API_URL || '').replace(/\/+$/, '')}${url}`;
+  let downloadUrl;
+
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    downloadUrl = url;
+  } else {
+    downloadUrl = `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+  }
 
   const link = document.createElement('a');
 
@@ -124,10 +164,9 @@ export function triggerDownload(url, filename) {
     link.download = filename;
   }
 
-  link.target = '_blank';
-  link.rel = 'noopener noreferrer';
-
   document.body.appendChild(link);
+
   link.click();
+
   document.body.removeChild(link);
 }
