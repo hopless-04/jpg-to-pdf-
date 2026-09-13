@@ -2,7 +2,6 @@ const fs = require('fs');
 const path = require('path');
 const { PDFDocument } = require('pdf-lib');
 const canvasModule = require('@napi-rs/canvas');
-const archiver = require('archiver');
 const { parsePageRange } = require('../utils/pageRange');
 const { formatBytes, sanitizeFilename } = require('../utils/fileHelper');
 
@@ -17,6 +16,7 @@ async function getPdfJs() {
   if (!pdfjsLib) {
     pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
   }
+
   return pdfjsLib;
 }
 
@@ -144,6 +144,7 @@ async function convertPdfToJpg({
   }
 
   const totalPages = doc.numPages;
+
   const targetPages = parsePageRange(
     pageRange,
     totalPages
@@ -238,9 +239,8 @@ async function convertPdfToJpg({
       width: canvas.width,
       height: canvas.height,
       fileSize: jpgBuffer.length,
-      fileSizeFormatted: formatBytes(
-        jpgBuffer.length
-      ),
+      fileSizeFormatted:
+        formatBytes(jpgBuffer.length),
       downloadUrl:
         `/api/download/${sessionId}/${encodeURIComponent(filename)}`
     });
@@ -277,99 +277,55 @@ async function convertPdfToJpg({
 /**
  * Creates a zip archive of the converted files
  */
-function createZipArchive(
+async function createZipArchive(
   sessionDir,
   filenames,
   zipOutputPath
 ) {
-  return new Promise((resolve, reject) => {
-
-    const output =
-      fs.createWriteStream(zipOutputPath);
-
-    let archive;
-
+  return new Promise(async (resolve, reject) => {
     try {
-      const archiverPkg =
-        require('archiver');
+      // archiver is an ES Module, so use dynamic import()
+      const archiverModule = await import('archiver');
 
-      if (archiverPkg.ZipArchive) {
+      const archiver =
+        archiverModule.default || archiverModule;
 
-        archive =
-          new archiverPkg.ZipArchive({
-            zlib: { level: 6 }
+      const output =
+        fs.createWriteStream(zipOutputPath);
+
+      output.on('close', () => {
+        resolve(zipOutputPath);
+      });
+
+      output.on('error', (err) => {
+        reject(err);
+      });
+
+      const archive = archiver('zip', {
+        zlib: { level: 6 }
+      });
+
+      archive.on('error', (err) => {
+        reject(err);
+      });
+
+      archive.pipe(output);
+
+      for (const file of filenames) {
+        const filePath =
+          path.join(sessionDir, file);
+
+        if (fs.existsSync(filePath)) {
+          archive.file(filePath, {
+            name: file
           });
-
-      } else if (
-        typeof archiverPkg === 'function'
-      ) {
-
-        archive =
-          archiverPkg('zip', {
-            zlib: { level: 6 }
-          });
-
-      } else if (
-        archiverPkg.default
-      ) {
-
-        archive =
-          typeof archiverPkg.default === 'function'
-            ? archiverPkg.default('zip', {
-                zlib: { level: 6 }
-              })
-            : new archiverPkg.default.ZipArchive({
-                zlib: { level: 6 }
-              });
-
-      } else {
-        throw new Error(
-          'Could not initialize ZIP archive engine.'
-        );
+        }
       }
 
-    } catch (e) {
-      return reject(e);
-    }
+      await archive.finalize();
 
-    output.on(
-      'close',
-      () => resolve(zipOutputPath)
-    );
-
-    output.on(
-      'error',
-      err => reject(err)
-    );
-
-    archive.on(
-      'error',
-      err => reject(err)
-    );
-
-    archive.pipe(output);
-
-    for (const file of filenames) {
-
-      const filePath =
-        path.join(sessionDir, file);
-
-      if (fs.existsSync(filePath)) {
-        archive.file(
-          filePath,
-          { name: file }
-        );
-      }
-    }
-
-    const fin =
-      archive.finalize();
-
-    if (
-      fin &&
-      typeof fin.catch === 'function'
-    ) {
-      fin.catch(reject);
+    } catch (error) {
+      reject(error);
     }
   });
 }
