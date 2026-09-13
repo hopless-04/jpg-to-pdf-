@@ -150,15 +150,21 @@ async function convertPdfToJpg({
     totalPages
   );
 
-  // Setup session output directory
-  // Vercel only allows writing to /tmp
-  const isVercel = process.env.VERCEL === '1';
+  // Get writable output directory
+// Vercel serverless functions can ONLY write to /tmp
+const isVercel = process.env.VERCEL === '1';
 
-  const outputBase = isVercel
-    ? '/tmp/output'
-    : path.resolve(
-        process.env.OUTPUT_DIR || './output'
-      );
+const outputBase = isVercel
+  ? '/tmp/output'
+  : path.resolve(process.env.OUTPUT_DIR || './output');
+
+console.log('VERCEL:', process.env.VERCEL);
+console.log('OUTPUT DIR:', outputBase);
+
+// Make sure the output directory exists
+if (!fs.existsSync(outputBase)) {
+  fs.mkdirSync(outputBase, { recursive: true });
+}
 
   const sessionDir = path.join(
     outputBase,
